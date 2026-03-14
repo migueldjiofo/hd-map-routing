@@ -1,0 +1,59 @@
+graphhopper:
+
+  datareader.file: freiburg-regbez-260313.osm.pbf
+  graph.location: gh-cache
+
+  import.osm.ignored_highways: motorway,trunk
+
+  # FR: Valeurs encodées nécessaires pour le custom model (exigé par GH 11)
+  # DE: Kodierte Werte für das Custom Model (von GH 11 benötigt)
+  graph.encoded_values: bike_priority, bike_road_access, mtb_rating, hike_rating, country, road_class, bike_access, bike_average_speed, average_slope
+
+  # FR: Données de hauteur SRTM — simulation du feature HD-Map
+  # DE: SRTM-Höhendaten — Simulation des HD-Map-Features
+  elevation:
+    provider: srtm
+    cache_dir: srtm_cache
+
+  profiles:
+
+    # FR: Profil standard — utilise le fichier bike.json intégré à GH
+    # DE: Standard-Profil — nutzt die eingebaute bike.json von GH
+    - name: bike
+      custom_model_files: [bike.json]
+
+    # FR: Profil optimisé — pénalise les montées via average_slope
+    # DE: Höhenoptimiertes Profil — bestraft Steigungen via average_slope
+    - name: bike_elevation
+      custom_model:
+        speed:
+          # FR: Vitesse de base 15 km/h pour tous les segments
+          # DE: Grundgeschwindigkeit 15 km/h für alle Segmente
+          - if: "true"
+            limit_to: "15"
+        priority:
+          # FR: Pente légère (3-6%) — priorité réduite de moitié
+          # DE: Leichte Steigung (3-6%) — Priorität halbiert
+          - if: "average_slope > 0.03"
+            multiply_by: "0.5"
+          # FR: Pente moyenne (6-10%) — fortement pénalisée
+          # DE: Mittlere Steigung (6-10%) — stark bestraft
+          - if: "average_slope > 0.06"
+            multiply_by: "0.2"
+          # FR: Forte pente (>10%) — quasi impraticable
+          # DE: Starke Steigung (>10%) — kaum passierbar
+          - if: "average_slope > 0.10"
+            multiply_by: "0.05"
+
+  ch:
+    profiles: []
+  lm:
+    profiles: bike,bike_elevation
+
+server:
+  application_connectors:
+    - type: http
+      port: 8989
+  admin_connectors:
+    - type: http
+      port: 8990
