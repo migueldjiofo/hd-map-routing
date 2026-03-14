@@ -36,7 +36,7 @@ class GraphHopperClient:
             ],
             "profile": profile,
             "points_encoded": "false",  # FR: coordonnées GeoJSON / DE: GeoJSON-Koordinaten
-            "elevation": "true",        # FR: inclure les hauteurs / DE: Höhen einschließen
+            "elevation": "false",        # FR: inclure les hauteurs / DE: Höhen einschließen
             "instructions": "false",    # FR: pas de navigation guidée / DE: keine Abbiegehinweise
         }
 

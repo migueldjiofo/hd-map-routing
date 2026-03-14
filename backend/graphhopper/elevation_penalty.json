@@ -1,0 +1,16 @@
+{
+  "priority": [
+    {
+      "if": "average_slope > 0.03",
+      "multiply_by": "0.5"
+    },
+    {
+      "else_if": "average_slope > 0.06",
+      "multiply_by": "0.2"
+    },
+    {
+      "else_if": "average_slope > 0.10",
+      "multiply_by": "0.05"
+    }
+  ]
+}

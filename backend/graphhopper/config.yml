@@ -1,55 +1,57 @@
+# =============================================================================
+# config.yml — GraphHopper 11.0
+# FR: Configuration pour le routing Micro-Mobility avec données de hauteur SRTM
+# DE: Konfiguration für Micro-Mobility Routing mit SRTM-Höhendaten
+# =============================================================================
+
 graphhopper:
 
+  # FR: Fichier OSM téléchargé depuis Geofabrik
+  # DE: OSM-Datei heruntergeladen von Geofabrik
   datareader.file: freiburg-regbez-260313.osm.pbf
+
+  # FR: Dossier où GraphHopper stocke le graphe préparé
+  # DE: Ordner wo GraphHopper den vorberechneten Graphen speichert
   graph.location: gh-cache
 
+  # FR: Exclut les autoroutes (inaccessibles aux vélos/E-Scooters)
+  # DE: Schließt Autobahnen aus (nicht zugänglich für Fahrräder/E-Scooter)
   import.osm.ignored_highways: motorway,trunk
 
-  # FR: Valeurs encodées nécessaires pour le custom model (exigé par GH 11)
-  # DE: Kodierte Werte für das Custom Model (von GH 11 benötigt)
+  # FR: Valeurs encodées nécessaires pour le custom model et les hauteurs
+  # DE: Kodierte Werte für das Custom Model und die Höhendaten
   graph.encoded_values: bike_priority, bike_road_access, mtb_rating, hike_rating, country, road_class, bike_access, bike_average_speed, average_slope
 
-  # FR: Données de hauteur SRTM — simulation du feature HD-Map
-  # DE: SRTM-Höhendaten — Simulation des HD-Map-Features
+  # FR: Données SRTM locales — fichiers HGT téléchargés manuellement
+  # DE: Lokale SRTM-Daten — manuell heruntergeladene HGT-Dateien
   elevation:
     provider: srtm
     cache_dir: srtm_cache
+    interpolate_elevation_from_border: true
 
   profiles:
 
-    # FR: Profil standard — utilise le fichier bike.json intégré à GH
-    # DE: Standard-Profil — nutzt die eingebaute bike.json von GH
+    # FR: Profil 1 — Standard, route la plus rapide à vélo
+    # DE: Profil 1 — Standard, schnellste Fahrradroute
     - name: bike
       custom_model_files: [bike.json]
 
-    # FR: Profil optimisé — pénalise les montées via average_slope
-    # DE: Höhenoptimiertes Profil — bestraft Steigungen via average_slope
+    # FR: Profil 2 — Hauteur optimisée, combine bike.json + pénalité de pente
+    # DE: Profil 2 — Höhenoptimiert, kombiniert bike.json + Steigungsstrafe
     - name: bike_elevation
-      custom_model:
-        speed:
-          # FR: Vitesse de base 15 km/h pour tous les segments
-          # DE: Grundgeschwindigkeit 15 km/h für alle Segmente
-          - if: "true"
-            limit_to: "15"
-        priority:
-          # FR: Pente légère (3-6%) — priorité réduite de moitié
-          # DE: Leichte Steigung (3-6%) — Priorität halbiert
-          - if: "average_slope > 0.03"
-            multiply_by: "0.5"
-          # FR: Pente moyenne (6-10%) — fortement pénalisée
-          # DE: Mittlere Steigung (6-10%) — stark bestraft
-          - if: "average_slope > 0.06"
-            multiply_by: "0.2"
-          # FR: Forte pente (>10%) — quasi impraticable
-          # DE: Starke Steigung (>10%) — kaum passierbar
-          - if: "average_slope > 0.10"
-            multiply_by: "0.05"
+      custom_model_files: [bike.json, elevation_penalty.json]
 
+  # FR: CH désactivé (incompatible avec custom models) — LM utilisé à la place
+  # DE: CH deaktiviert (inkompatibel mit Custom Models) — LM wird verwendet
   ch:
     profiles: []
   lm:
     profiles: bike,bike_elevation
 
+# =============================================================================
+# FR: Serveur web GraphHopper
+# DE: GraphHopper Web-Server
+# =============================================================================
 server:
   application_connectors:
     - type: http

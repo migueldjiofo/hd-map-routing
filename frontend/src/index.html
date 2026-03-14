@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HD-Map Routing — Micro-Mobility</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet" />
+
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+
+<body>
+
+  <!-- SIDEBAR GAUCHE -->
+  <aside class="sidebar">
+
+    <!-- En-tête -->
+    <div class="sidebar-header">
+      <div class="logo-block">
+        <span class="logo-icon">◈</span>
+        <div>
+          <div class="logo-title">HD-Map Routing</div>
+          <div class="logo-sub">Micro-Mobility Navigation · Freiburg</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Saisie des coordonnées -->
+    <section class="input-section">
+      <div class="section-label">KOORDINATEN EINGEBEN</div>
+
+      <div class="coord-group">
+        <label class="coord-label">
+          <span class="dot dot--start"></span> STARTPUNKT
+        </label>
+        <div class="coord-row">
+          <div class="coord-field">
+            <span class="coord-field-label">LAT</span>
+            <input type="number" id="start_lat" step="0.0001"
+                   value="47.9990" />
+          </div>
+          <div class="coord-field">
+            <span class="coord-field-label">LON</span>
+            <input type="number" id="start_lon" step="0.0001"
+                   value="7.8421" />
+          </div>
+        </div>
+      </div>
+
+      <div class="coord-group">
+        <label class="coord-label">
+          <span class="dot dot--end"></span> ZIELPUNKT
+        </label>
+        <div class="coord-row">
+          <div class="coord-field">
+            <span class="coord-field-label">LAT</span>
+            <input type="number" id="end_lat" step="0.0001"
+                   value="47.9701" />
+          </div>
+          <div class="coord-field">
+            <span class="coord-field-label">LON</span>
+            <input type="number" id="end_lon" step="0.0001"
+                   value="7.8594" />
+          </div>
+        </div>
+      </div>
+
+      <div class="hint-text">
+        💡 Karte anklicken: 1. Klick = Start, 2. Klick = Ziel
+      </div>
+
+      <button class="btn-route" id="btn-route"
+              onclick="app.calculateRoute()">
+        <span class="btn-icon">⟶</span>
+        Route berechnen
+      </button>
+    </section>
+
+    <!-- Barre de statut -->
+    <div class="status-bar" id="status-bar">
+      <span id="status-text">Bereit</span>
+    </div>
+
+    <!-- Boîte d'erreur -->
+    <div class="error-box" id="error-box" style="display:none">
+      <span id="error-text"></span>
+    </div>
+
+    <!-- Légende -->
+    <section class="legend-section">
+      <div class="section-label">LEGENDE</div>
+      <div class="legend-items">
+        <div class="legend-item">
+          <div class="legend-line legend-line--standard"></div>
+          <span>Standard (schnellste Route)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-line legend-line--elevation"></div>
+          <span>Höhenoptimiert (energiesparend)</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Statistiques (visibles après calcul) -->
+    <section class="stats-section" id="stats-section"
+             style="display:none">
+      <div class="section-label">ROUTENVERGLEICH</div>
+
+      <div class="stats-card stats-card--standard">
+        <div class="stats-card-header">
+          <div class="stats-dot stats-dot--standard"></div>
+          Standard
+        </div>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-value" id="std-distance">—</div>
+            <div class="stat-label">Distanz</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="std-duration">—</div>
+            <div class="stat-label">Fahrzeit</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="std-gain">—</div>
+            <div class="stat-label">Aufstieg</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="std-loss">—</div>
+            <div class="stat-label">Abstieg</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats-card stats-card--elevation">
+        <div class="stats-card-header">
+          <div class="stats-dot stats-dot--elevation"></div>
+          Höhenoptimiert
+        </div>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-value" id="elv-distance">—</div>
+            <div class="stat-label">Distanz</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="elv-duration">—</div>
+            <div class="stat-label">Fahrzeit</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="elv-gain">—</div>
+            <div class="stat-label">Aufstieg</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="elv-loss">—</div>
+            <div class="stat-label">Abstieg</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="savings-box" id="savings-box"></div>
+    </section>
+
+    <div class="sidebar-footer">
+      Navigation WS 2025/26 · BHT Berlin · Miguel Djiofo
+    </div>
+
+  </aside>
+
+  <!-- CARTE -->
+  <main class="map-container">
+    <div id="map"></div>
+  </main>
+
+  <!-- Scripts (ordre important) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/routing.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>
