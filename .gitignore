@@ -1,0 +1,19 @@
+﻿# GraphHopper — fichiers trop lourds pour Git (>50MB)
+*.osm.pbf
+*.jar
+gh-cache/
+srtm_cache/
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
