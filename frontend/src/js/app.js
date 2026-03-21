@@ -152,11 +152,11 @@ const app = {
   // -------------------------------------------------------------------
   // FR: Estimation de la consommation d'énergie E-Scooter
   // DE: Schätzung des E-Scooter Energieverbrauchs
-  // Formule / Formel: E = (masse * g * distance * Cr + masse * g * dénivelé) / efficacité
+  // Formule: E = (m * g * Cr * d + m * g * h) / η
   // -------------------------------------------------------------------
   _updateEnergyEstimates(std, elv) {
-    const stdWh  = Utils.estimateEnergy(std.distance_m,  std.elevation_gain_m);
-    const elvWh  = Utils.estimateEnergy(elv.distance_m, elv.elevation_gain_m);
+    const stdWh = Utils.estimateEnergy(std.distance_m,  std.elevation_gain_m);
+    const elvWh = Utils.estimateEnergy(elv.distance_m, elv.elevation_gain_m);
 
     document.getElementById('std-energy').textContent = `${stdWh} Wh`;
     document.getElementById('elv-energy').textContent = `${elvWh} Wh`;
@@ -165,36 +165,32 @@ const app = {
   },
 
   // -------------------------------------------------------------------
-  // FR: Construit le graphique du profil de hauteur avec Chart.js
-  // DE: Erstellt das Höhenprofil-Diagramm mit Chart.js
+  // FR: Construit le profil de hauteur avec les vraies données SRTM
+  //     reçues depuis Open-Elevation via le backend Flask
+  // DE: Erstellt das Höhenprofil mit echten SRTM-Daten
+  //     empfangen von Open-Elevation via Flask-Backend
   // -------------------------------------------------------------------
   _buildElevationProfile(std, elv) {
-    // FR: Simuler une élévation basée sur la distance (données SRTM non dispo)
-    // DE: Höhe basierend auf Distanz simulieren (SRTM-Daten nicht verfügbar)
-    this._chartDataStd = this._simulateElevationProfile(std);
-    this._chartDataElv = this._simulateElevationProfile(elv);
+    // FR: Utiliser les vraies données elevation_profile de l'API
+    // DE: Echte elevation_profile-Daten der API verwenden
+    this._chartDataStd = this._parseElevationProfile(std.elevation_profile);
+    this._chartDataElv = this._parseElevationProfile(elv.elevation_profile);
 
     document.getElementById('elevation-profile').style.display = 'block';
     this.showChart('standard');
   },
 
-  _simulateElevationProfile(route) {
-    // FR: Crée des points de distance réguliers le long de la route
-    // DE: Erstellt gleichmäßige Distanzpunkte entlang der Route
-    const n = Math.min(route.coordinates.length, 40);
-    const step = Math.floor(route.coordinates.length / n);
-    const labels = [];
-    const values = [];
-    let dist = 0;
-
-    for (let i = 0; i < route.coordinates.length; i += step) {
-      dist += (route.distance_m / n) / 1000;
-      labels.push(dist.toFixed(2) + ' km');
-      // FR: Valeur simulée — sera remplacée par vraies données SRTM
-      // DE: Simulierter Wert — wird durch echte SRTM-Daten ersetzt
-      values.push(200 + Math.round(Math.random() * route.elevation_gain_m * 0.3));
+  _parseElevationProfile(profile) {
+    // FR: Convertit le profil API {distance_km, altitude_m} en format Chart.js
+    // DE: Konvertiert das API-Profil {distance_km, altitude_m} in Chart.js-Format
+    if (!profile || profile.length === 0) {
+      return { labels: [], values: [] };
     }
-    return { labels, values };
+
+    return {
+      labels: profile.map(p => p.distance_km.toFixed(2) + ' km'),
+      values: profile.map(p => p.altitude_m),
+    };
   },
 
   showChart(type) {
@@ -203,8 +199,8 @@ const app = {
     document.getElementById('chart-tab-std').classList.toggle('active', type === 'standard');
     document.getElementById('chart-tab-elv').classList.toggle('active', type === 'elevation');
 
-    const data   = type === 'standard' ? this._chartDataStd : this._chartDataElv;
-    const color  = type === 'standard' ? '#4A9EFF' : '#00C9A7';
+    const data  = type === 'standard' ? this._chartDataStd : this._chartDataElv;
+    const color = type === 'standard' ? '#4A9EFF' : '#00C9A7';
     const canvas = document.getElementById('elevation-chart');
 
     if (this.elevationChart) {
@@ -284,8 +280,8 @@ const app = {
   },
 
   // -------------------------------------------------------------------
-  // FR: Export GeoJSON — format standard pour systèmes autonomes
-  // DE: GeoJSON-Export — Standardformat für autonome Systeme
+  // FR: Export GeoJSON avec coordonnées 3D (lat, lon, altitude SRTM)
+  // DE: GeoJSON-Export mit 3D-Koordinaten (lat, lon, SRTM-Höhe)
   // -------------------------------------------------------------------
   exportGeoJSON() {
     if (!this.routeData) return;
@@ -293,35 +289,44 @@ const app = {
     const std = this.routeData.standard_route;
     const elv = this.routeData.elevation_optimized_route;
 
+    // FR: Utiliser coordinates_3d si disponibles, sinon coordinates
+    // DE: coordinates_3d verwenden wenn verfügbar, sonst coordinates
+    const stdCoords = (std.coordinates_3d || std.coordinates)
+      .map(c => c.length === 3 ? [c[1], c[0], c[2]] : [c[1], c[0]]);
+    const elvCoords = (elv.coordinates_3d || elv.coordinates)
+      .map(c => c.length === 3 ? [c[1], c[0], c[2]] : [c[1], c[0]]);
+
     const geojson = {
       type: "FeatureCollection",
       features: [
         {
           type: "Feature",
           properties: {
-            name:         "Standard Route",
-            profile:      "bike",
-            distance_m:   std.distance_m,
-            duration_s:   std.duration_s,
+            name:             "Standard Route",
+            profile:          "bike",
+            distance_m:       std.distance_m,
+            duration_s:       std.duration_s,
+            elevation_gain_m: std.elevation_gain_m,
+            elevation_loss_m: std.elevation_loss_m,
           },
           geometry: {
-            type: "LineString",
-            // FR: Leaflet [lat,lon] → GeoJSON [lon,lat]
-            // DE: Leaflet [lat,lon] → GeoJSON [lon,lat]
-            coordinates: std.coordinates.map(c => [c[1], c[0]])
+            type:        "LineString",
+            coordinates: stdCoords,
           }
         },
         {
           type: "Feature",
           properties: {
-            name:         "Höhenoptimierte Route",
-            profile:      "bike_elevation",
-            distance_m:   elv.distance_m,
-            duration_s:   elv.duration_s,
+            name:             "Höhenoptimierte Route",
+            profile:          "bike_elevation",
+            distance_m:       elv.distance_m,
+            duration_s:       elv.duration_s,
+            elevation_gain_m: elv.elevation_gain_m,
+            elevation_loss_m: elv.elevation_loss_m,
           },
           geometry: {
-            type: "LineString",
-            coordinates: elv.coordinates.map(c => [c[1], c[0]])
+            type:        "LineString",
+            coordinates: elvCoords,
           }
         }
       ]
@@ -335,18 +340,22 @@ const app = {
   },
 
   // -------------------------------------------------------------------
-  // FR: Export GPX — compatible GPS, ROS, Apollo.auto
-  // DE: GPX-Export — kompatibel mit GPS, ROS, Apollo.auto
+  // FR: Export GPX avec altitude SRTM dans les trackpoints
+  // DE: GPX-Export mit SRTM-Höhe in den Trackpoints
   // -------------------------------------------------------------------
   exportGPX() {
     if (!this.routeData) return;
 
     const std = this.routeData.standard_route;
 
-    // FR: Construire le XML GPX
-    // DE: GPX-XML aufbauen
-    const trackpoints = std.coordinates
-      .map(c => `    <trkpt lat="${c[0]}" lon="${c[1]}"></trkpt>`)
+    // FR: Utiliser coordinates_3d pour inclure l'altitude dans le GPX
+    // DE: coordinates_3d verwenden um Höhe in GPX einzuschließen
+    const coords = std.coordinates_3d || std.coordinates;
+    const trackpoints = coords
+      .map(c => {
+        const ele = c.length === 3 ? `\n      <ele>${c[2]}</ele>` : '';
+        return `    <trkpt lat="${c[0]}" lon="${c[1]}">${ele}\n    </trkpt>`;
+      })
       .join('\n');
 
     const gpx = `<?xml version="1.0" encoding="UTF-8"?>
@@ -405,7 +414,7 @@ ${trackpoints}
     if (isLoading) {
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner"></span> Berechne...';
-      this._setStatus('loading', 'GraphHopper berechnet Routen…');
+      this._setStatus('loading', 'GraphHopper + Open-Elevation werden abgefragt…');
     } else {
       btn.disabled = false;
       btn.innerHTML = '<span class="btn-icon">⟶</span> Route berechnen';

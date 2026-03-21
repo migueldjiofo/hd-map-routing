@@ -3,29 +3,32 @@
 
 from flask import Blueprint, request, jsonify
 from graphhopper_client import GraphHopperClient
+from elevation_client import ElevationClient
 from utils import validate_coordinates, format_error, format_success
 
 api_blueprint = Blueprint("api", __name__)
-gh_client = GraphHopperClient(base_url="http://localhost:8989")
+
+# FR: Instances des clients GraphHopper et Open-Elevation
+# DE: Instanzen der GraphHopper- und Open-Elevation-Clients
+gh_client  = GraphHopperClient(base_url="http://localhost:8989")
+elv_client = ElevationClient()
 
 
 # -----------------------------------------------------------------------------
 # POST /api/route
+# FR: Calcule les deux routes + enrichit avec données SRTM Open-Elevation
+# DE: Berechnet beide Routen + reichert mit SRTM Open-Elevation-Daten an
 # -----------------------------------------------------------------------------
 @api_blueprint.route("/route", methods=["POST"])
 def calculate_route():
-    """
-    FR: Calcule les deux routes (standard + optimisée).
-    DE: Berechnet beide Routen (Standard + höhenoptimiert).
-    """
     data = request.get_json()
     if not data:
-        return jsonify(format_error("Le corps de la requête doit être du JSON")), 400
+        return jsonify(format_error("JSON body erforderlich")), 400
 
     required = ["start_lat", "start_lon", "end_lat", "end_lon"]
     missing = [f for f in required if f not in data]
     if missing:
-        return jsonify(format_error(f"Paramètres manquants: {', '.join(missing)}")), 400
+        return jsonify(format_error(f"Fehlende Parameter: {', '.join(missing)}")), 400
 
     try:
         start_lat = float(data["start_lat"])
@@ -33,12 +36,14 @@ def calculate_route():
         end_lat   = float(data["end_lat"])
         end_lon   = float(data["end_lon"])
     except (ValueError, TypeError):
-        return jsonify(format_error("Les coordonnées doivent être des nombres valides")), 400
+        return jsonify(format_error("Koordinaten müssen Zahlen sein")), 400
 
     error = validate_coordinates(start_lat, start_lon, end_lat, end_lon)
     if error:
         return jsonify(format_error(error)), 400
 
+    # FR: Étape 1 — Calculer les routes via GraphHopper
+    # DE: Schritt 1 — Routen via GraphHopper berechnen
     try:
         standard_route  = gh_client.get_route(
             start_lat, start_lon, end_lat, end_lon, profile="bike"
@@ -51,21 +56,38 @@ def calculate_route():
     except ValueError as e:
         return jsonify(format_error(str(e))), 404
 
+    # FR: Étape 2 — Enrichir les coordonnées avec les altitudes SRTM
+    # DE: Schritt 2 — Koordinaten mit SRTM-Höhen anreichern
+    std_elevation  = elv_client.enrich_route(standard_route["coordinates"])
+    elv_elevation  = elv_client.enrich_route(elevation_route["coordinates"])
+
+    # FR: Étape 3 — Fusionner les données de route et d'élévation
+    # DE: Schritt 3 — Routen- und Höhendaten zusammenführen
+    standard_route.update({
+        "coordinates_3d":    std_elevation["coordinates_3d"],
+        "elevation_gain_m":  std_elevation["elevation_gain_m"],
+        "elevation_loss_m":  std_elevation["elevation_loss_m"],
+        "elevation_profile": std_elevation["elevation_profile"],
+    })
+
+    elevation_route.update({
+        "coordinates_3d":    elv_elevation["coordinates_3d"],
+        "elevation_gain_m":  elv_elevation["elevation_gain_m"],
+        "elevation_loss_m":  elv_elevation["elevation_loss_m"],
+        "elevation_profile": elv_elevation["elevation_profile"],
+    })
+
     return jsonify(format_success(standard_route, elevation_route)), 200
 
 
 # -----------------------------------------------------------------------------
 # POST /api/isochrone
-# FR: Calcule une zone d'accessibilité depuis un point
-# DE: Berechnet eine Erreichbarkeitszone von einem Punkt
 # -----------------------------------------------------------------------------
 @api_blueprint.route("/isochrone", methods=["POST"])
 def calculate_isochrone():
     """
-    FR: Reçoit un point et un temps limite, retourne le polygone d'isochrone.
-    DE: Empfängt einen Punkt und ein Zeitlimit, gibt das Isochronen-Polygon zurück.
-
-    Body: { lat, lon, time_minutes, profile }
+    FR: Calcule une zone d'accessibilité depuis un point.
+    DE: Berechnet eine Erreichbarkeitszone von einem Punkt.
     """
     data = request.get_json()
     if not data:
@@ -85,7 +107,7 @@ def calculate_isochrone():
         return jsonify(format_error("Ungültige Parameter")), 400
 
     if not (1 <= time_minutes <= 60):
-        return jsonify(format_error("time_minutes doit être entre 1 et 60")), 400
+        return jsonify(format_error("time_minutes muss zwischen 1 und 60 liegen")), 400
 
     try:
         isochrone = gh_client.get_isochrone(
