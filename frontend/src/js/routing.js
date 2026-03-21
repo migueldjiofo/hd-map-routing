@@ -3,17 +3,14 @@
 
 const RoutingService = {
 
-  // FR: URL de base du backend Flask
-  // DE: Basis-URL des Flask-Backends
   API_BASE: 'http://localhost:5000/api',
 
   // -------------------------------------------------------------------
-  // FR: Envoie les coordonnées au backend et retourne les deux routes
-  // DE: Sendet Koordinaten ans Backend und gibt beide Routen zurück
+  // FR: Calcule les deux routes via le backend Flask
+  // DE: Berechnet beide Routen via Flask-Backend
   // -------------------------------------------------------------------
   async fetchRoutes(startLat, startLon, endLat, endLon) {
     let response;
-
     try {
       response = await fetch(`${this.API_BASE}/route`, {
         method:  'POST',
@@ -26,8 +23,6 @@ const RoutingService = {
         }),
       });
     } catch (networkError) {
-      // FR: Le backend Flask n'est pas accessible
-      // DE: Das Flask-Backend ist nicht erreichbar
       throw new Error(
         'Backend nicht erreichbar. ' +
         'Läuft Flask auf Port 5000? → python app.py'
@@ -35,11 +30,37 @@ const RoutingService = {
     }
 
     const data = await response.json();
-
     if (!response.ok || data.status === 'error') {
       throw new Error(data.message || `HTTP Fehler ${response.status}`);
     }
+    return data;
+  },
 
+  // -------------------------------------------------------------------
+  // FR: Calcule une isochrone via le backend Flask
+  // DE: Berechnet eine Isochronen via Flask-Backend
+  // -------------------------------------------------------------------
+  async fetchIsochrone(lat, lon, timeMinutes, profile) {
+    let response;
+    try {
+      response = await fetch(`${this.API_BASE}/isochrone`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lat:          lat,
+          lon:          lon,
+          time_minutes: timeMinutes,
+          profile:      profile,
+        }),
+      });
+    } catch (networkError) {
+      throw new Error('Backend nicht erreichbar.');
+    }
+
+    const data = await response.json();
+    if (!response.ok || data.status === 'error') {
+      throw new Error(data.message || `HTTP Fehler ${response.status}`);
+    }
     return data;
   },
 

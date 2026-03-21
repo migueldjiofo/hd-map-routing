@@ -4,22 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>HD-Map Routing — Micro-Mobility</title>
-
-  <!-- Leaflet CSS -->
   <link rel="stylesheet"
         href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
-  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
         rel="stylesheet" />
-
+  <!-- Chart.js pour le profil de hauteur / für das Höhenprofil -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 
 <body>
 
-  <!-- SIDEBAR GAUCHE -->
   <aside class="sidebar">
 
     <!-- En-tête -->
@@ -33,48 +29,83 @@
       </div>
     </div>
 
-    <!-- Saisie des coordonnées -->
+    <!-- Saisie -->
     <section class="input-section">
-      <div class="section-label">KOORDINATEN EINGEBEN</div>
+      <div class="section-label">START & ZIEL EINGEBEN</div>
 
-      <div class="coord-group">
-        <label class="coord-label">
-          <span class="dot dot--start"></span> STARTPUNKT
-        </label>
-        <div class="coord-row">
-          <div class="coord-field">
-            <span class="coord-field-label">LAT</span>
-            <input type="number" id="start_lat" step="0.0001"
-                   value="47.9990" />
+      <!-- Tabs -->
+      <div class="input-tabs">
+        <button class="tab-btn active" id="tab-address"
+                onclick="app.switchTab('address')">Adresse</button>
+        <button class="tab-btn" id="tab-coords"
+                onclick="app.switchTab('coords')">Koordinaten</button>
+      </div>
+
+      <!-- TAB ADRESSE -->
+      <div id="panel-address">
+        <div class="coord-group">
+          <label class="coord-label">
+            <span class="dot dot--start"></span> STARTADRESSE
+          </label>
+          <div class="address-row">
+            <input type="text" id="start_address"
+                   placeholder="z.B. Bertoldstraße 1, 79098 Freiburg"
+                   class="address-input" />
+            <button class="btn-geo" onclick="app.geocodeStart()"
+                    title="Adresse suchen">⌕</button>
           </div>
-          <div class="coord-field">
-            <span class="coord-field-label">LON</span>
-            <input type="number" id="start_lon" step="0.0001"
-                   value="7.8421" />
+          <div class="geo-result" id="start-geo-result"></div>
+        </div>
+        <div class="coord-group">
+          <label class="coord-label">
+            <span class="dot dot--end"></span> ZIELADRESSE
+          </label>
+          <div class="address-row">
+            <input type="text" id="end_address"
+                   placeholder="z.B. Schauinslandstraße 1, 79100 Freiburg"
+                   class="address-input" />
+            <button class="btn-geo" onclick="app.geocodeEnd()"
+                    title="Adresse suchen">⌕</button>
           </div>
+          <div class="geo-result" id="end-geo-result"></div>
         </div>
       </div>
 
-      <div class="coord-group">
-        <label class="coord-label">
-          <span class="dot dot--end"></span> ZIELPUNKT
-        </label>
-        <div class="coord-row">
-          <div class="coord-field">
-            <span class="coord-field-label">LAT</span>
-            <input type="number" id="end_lat" step="0.0001"
-                   value="47.9701" />
-          </div>
-          <div class="coord-field">
-            <span class="coord-field-label">LON</span>
-            <input type="number" id="end_lon" step="0.0001"
-                   value="7.8594" />
+      <!-- TAB KOORDINATEN -->
+      <div id="panel-coords" style="display:none">
+        <div class="coord-group">
+          <label class="coord-label">
+            <span class="dot dot--start"></span> STARTPUNKT
+          </label>
+          <div class="coord-row">
+            <div class="coord-field">
+              <span class="coord-field-label">LAT</span>
+              <input type="number" id="start_lat" step="0.0001" value="47.9990" />
+            </div>
+            <div class="coord-field">
+              <span class="coord-field-label">LON</span>
+              <input type="number" id="start_lon" step="0.0001" value="7.8421" />
+            </div>
           </div>
         </div>
-      </div>
-
-      <div class="hint-text">
-        💡 Karte anklicken: 1. Klick = Start, 2. Klick = Ziel
+        <div class="coord-group">
+          <label class="coord-label">
+            <span class="dot dot--end"></span> ZIELPUNKT
+          </label>
+          <div class="coord-row">
+            <div class="coord-field">
+              <span class="coord-field-label">LAT</span>
+              <input type="number" id="end_lat" step="0.0001" value="47.9701" />
+            </div>
+            <div class="coord-field">
+              <span class="coord-field-label">LON</span>
+              <input type="number" id="end_lon" step="0.0001" value="7.8594" />
+            </div>
+          </div>
+        </div>
+        <div class="hint-text">
+          💡 Karte anklicken: 1. Klick = Start, 2. Klick = Ziel
+        </div>
       </div>
 
       <button class="btn-route" id="btn-route"
@@ -84,15 +115,30 @@
       </button>
     </section>
 
-    <!-- Barre de statut -->
+    <!-- Statut -->
     <div class="status-bar" id="status-bar">
       <span id="status-text">Bereit</span>
     </div>
 
-    <!-- Boîte d'erreur -->
+    <!-- Erreur -->
     <div class="error-box" id="error-box" style="display:none">
       <span id="error-text"></span>
     </div>
+
+    <!-- Style de carte -->
+    <section class="map-style-section">
+      <div class="section-label">KARTENSTIL</div>
+      <div class="map-style-buttons">
+        <button class="map-style-btn active" data-style="dark"
+                onclick="MapManager.setTileStyle('dark')">🌑 Dark</button>
+        <button class="map-style-btn" data-style="light"
+                onclick="MapManager.setTileStyle('light')">☀️ Light</button>
+        <button class="map-style-btn" data-style="osm"
+                onclick="MapManager.setTileStyle('osm')">🗺️ OSM</button>
+        <button class="map-style-btn" data-style="topo"
+                onclick="MapManager.setTileStyle('topo')">⛰️ Topo</button>
+      </div>
+    </section>
 
     <!-- Légende -->
     <section class="legend-section">
@@ -109,9 +155,8 @@
       </div>
     </section>
 
-    <!-- Statistiques (visibles après calcul) -->
-    <section class="stats-section" id="stats-section"
-             style="display:none">
+    <!-- Statistiques -->
+    <section class="stats-section" id="stats-section" style="display:none">
       <div class="section-label">ROUTENVERGLEICH</div>
 
       <div class="stats-card stats-card--standard">
@@ -136,6 +181,11 @@
             <div class="stat-value" id="std-loss">—</div>
             <div class="stat-label">Abstieg</div>
           </div>
+        </div>
+        <!-- Énergie Standard -->
+        <div class="energy-row" id="std-energy-row" style="display:none">
+          <span class="energy-label">⚡ Energieverbrauch (E-Scooter)</span>
+          <span class="energy-value" id="std-energy">—</span>
         </div>
       </div>
 
@@ -162,23 +212,92 @@
             <div class="stat-label">Abstieg</div>
           </div>
         </div>
+        <!-- Énergie Optimisé -->
+        <div class="energy-row" id="elv-energy-row" style="display:none">
+          <span class="energy-label">⚡ Energieverbrauch (E-Scooter)</span>
+          <span class="energy-value" id="elv-energy">—</span>
+        </div>
       </div>
 
       <div class="savings-box" id="savings-box"></div>
+
+      <!-- Profil de hauteur -->
+      <div class="elevation-profile" id="elevation-profile" style="display:none">
+        <div class="section-label" style="margin-top:14px">HÖHENPROFIL</div>
+        <div class="chart-tabs">
+          <button class="chart-tab active" id="chart-tab-std"
+                  onclick="app.showChart('standard')">Standard</button>
+          <button class="chart-tab" id="chart-tab-elv"
+                  onclick="app.showChart('elevation')">Höhenoptimiert</button>
+        </div>
+        <div class="chart-wrapper">
+          <canvas id="elevation-chart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Isochrone -->
+    <section class="iso-section">
+      <div class="section-label">ISOCHRONEN — ERREICHBARKEIT</div>
+      <div class="iso-controls">
+        <div class="iso-field">
+          <span class="iso-field-label">Minuten</span>
+          <select id="iso-time" class="iso-select">
+            <option value="5">5 min</option>
+            <option value="10" selected>10 min</option>
+            <option value="15">15 min</option>
+            <option value="20">20 min</option>
+            <option value="30">30 min</option>
+          </select>
+        </div>
+        <div class="iso-field">
+          <span class="iso-field-label">Profil</span>
+          <select id="iso-profile" class="iso-select">
+            <option value="bike">Standard</option>
+            <option value="bike_elevation">Höhenoptimiert</option>
+          </select>
+        </div>
+      </div>
+      <div class="hint-text" style="margin-bottom:10px">
+        💡 Startpunkt wird als Zentrum verwendet
+      </div>
+      <div style="display:flex; gap:6px">
+        <button class="btn-iso" onclick="app.calculateIsochrone()">
+          ⬡ Isochronen berechnen
+        </button>
+        <button class="btn-iso-clear" onclick="app.clearIsochrone()">✕</button>
+      </div>
+    </section>
+
+    <!-- Export -->
+    <section class="export-section">
+      <div class="section-label">EXPORT</div>
+      <div class="export-buttons">
+        <button class="btn-export" id="btn-geojson"
+                onclick="app.exportGeoJSON()" disabled>
+          ⬇ GeoJSON
+        </button>
+        <button class="btn-export" id="btn-gpx"
+                onclick="app.exportGPX()" disabled>
+          ⬇ GPX
+        </button>
+      </div>
+      <div class="hint-text" style="margin-top:6px">
+        Compatible avec Apollo.auto / ROS
+      </div>
     </section>
 
     <div class="sidebar-footer">
-      Navigation WS 2025/26 · BHT Berlin · Miguel Djiofo
+      Navigation WS 2025/26 · BHT Berlin · Miguel Djiofo · 880634
     </div>
 
   </aside>
 
-  <!-- CARTE -->
+  <!-- Carte -->
   <main class="map-container">
     <div id="map"></div>
   </main>
 
-  <!-- Scripts (ordre important) -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="js/utils.js"></script>
   <script src="js/map.js"></script>

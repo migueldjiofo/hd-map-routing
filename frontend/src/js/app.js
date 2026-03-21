@@ -3,50 +3,114 @@
 
 const app = {
 
+  activeTab: 'address',
+
+  // FR: Données des routes pour export et graphiques
+  // DE: Routendaten für Export und Diagramme
+  routeData: null,
+  elevationChart: null,
+
   // -------------------------------------------------------------------
-  // FR: Initialisation au chargement de la page
-  // DE: Initialisierung beim Laden der Seite
+  // FR: Initialisation
+  // DE: Initialisierung
   // -------------------------------------------------------------------
   init() {
     MapManager.init();
-    this._setStatus('ready', 'Bereit — Koordinaten eingeben oder Karte anklicken');
-    console.log('HD-Map Routing App gestartet.');
+    this._setStatus('ready', 'Bereit — Adresse eingeben oder Karte anklicken');
   },
 
   // -------------------------------------------------------------------
-  // FR: Déclenché par le bouton "Route berechnen"
-  // DE: Wird durch den Button "Route berechnen" ausgelöst
+  // FR: Bascule entre les onglets Adresse / Koordinaten
+  // DE: Wechselt zwischen Adress- und Koordinaten-Tab
+  // -------------------------------------------------------------------
+  switchTab(tab) {
+    this.activeTab = tab;
+    document.getElementById('panel-address').style.display =
+      tab === 'address' ? 'block' : 'none';
+    document.getElementById('panel-coords').style.display =
+      tab === 'coords' ? 'block' : 'none';
+    document.getElementById('tab-address').classList.toggle('active', tab === 'address');
+    document.getElementById('tab-coords').classList.toggle('active',  tab === 'coords');
+  },
+
+  // -------------------------------------------------------------------
+  // FR: Geocoding via Nominatim OSM
+  // DE: Geokodierung via Nominatim OSM
+  // -------------------------------------------------------------------
+  async geocodeStart() {
+    const address = document.getElementById('start_address').value.trim();
+    if (!address) return;
+    const result = await this._geocode(address);
+    if (!result) {
+      this._setGeoResult('start', '❌ Adresse nicht gefunden', true);
+      return;
+    }
+    document.getElementById('start_lat').value = result.lat;
+    document.getElementById('start_lon').value = result.lon;
+    MapManager.setStartMarker(result.lat, result.lon);
+    MapManager.map.setView([result.lat, result.lon], 15);
+    this._setGeoResult('start', `✓ ${result.display_name}`, false);
+  },
+
+  async geocodeEnd() {
+    const address = document.getElementById('end_address').value.trim();
+    if (!address) return;
+    const result = await this._geocode(address);
+    if (!result) {
+      this._setGeoResult('end', '❌ Adresse nicht gefunden', true);
+      return;
+    }
+    document.getElementById('end_lat').value = result.lat;
+    document.getElementById('end_lon').value = result.lon;
+    MapManager.setEndMarker(result.lat, result.lon);
+    this._setGeoResult('end', `✓ ${result.display_name}`, false);
+  },
+
+  async _geocode(address) {
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?` +
+        `q=${encodeURIComponent(address)}&format=json&limit=1&countrycodes=de`;
+      const response = await fetch(url, {
+        headers: { 'Accept-Language': 'de' }
+      });
+      const data = await response.json();
+      if (!data || data.length === 0) return null;
+      return {
+        lat:          parseFloat(data[0].lat),
+        lon:          parseFloat(data[0].lon),
+        display_name: data[0].display_name.split(',').slice(0, 3).join(', '),
+      };
+    } catch (e) {
+      return null;
+    }
+  },
+
+  // -------------------------------------------------------------------
+  // FR: Calcul des routes
+  // DE: Routenberechnung
   // -------------------------------------------------------------------
   async calculateRoute() {
-
-    // FR: Lire les coordonnées depuis les champs de saisie
-    // DE: Koordinaten aus den Eingabefeldern lesen
     const startLat = parseFloat(document.getElementById('start_lat').value);
     const startLon = parseFloat(document.getElementById('start_lon').value);
     const endLat   = parseFloat(document.getElementById('end_lat').value);
     const endLon   = parseFloat(document.getElementById('end_lon').value);
 
-    // FR: Validation basique côté client
-    // DE: Grundlegende Client-seitige Validierung
     if ([startLat, startLon, endLat, endLon].some(isNaN)) {
-      this._showError('Bitte alle vier Koordinatenfelder ausfüllen.');
+      this._showError(
+        this.activeTab === 'address'
+          ? 'Bitte erst Adressen suchen (⌕ klicken)'
+          : 'Bitte alle vier Koordinatenfelder ausfüllen'
+      );
       return;
     }
 
-    // FR: Mettre l'interface en état de chargement
-    // DE: UI in Ladezustand versetzen
     this._setLoading(true);
     this._hideError();
     this._hideStats();
     MapManager.clearRoutes();
-
-    // FR: Placer les marqueurs sur la carte
-    // DE: Marker auf der Karte setzen
     MapManager.setStartMarker(startLat, startLon);
     MapManager.setEndMarker(endLat, endLon);
 
-    // FR: Appel API au backend Flask
-    // DE: API-Aufruf an das Flask-Backend
     try {
       const data = await RoutingService.fetchRoutes(
         startLat, startLon, endLat, endLon
@@ -60,22 +124,24 @@ const app = {
     }
   },
 
-  // -------------------------------------------------------------------
-  // FR: Appelé quand les routes sont reçues avec succès
-  // DE: Wird aufgerufen wenn die Routen erfolgreich empfangen wurden
-  // -------------------------------------------------------------------
   _onRoutesReceived(data) {
     const std = data.standard_route;
     const elv = data.elevation_optimized_route;
 
-    // FR: Dessiner les deux routes sur la carte
-    // DE: Beide Routen auf der Karte zeichnen
-    MapManager.drawRoutes(std.coordinates, elv.coordinates);
+    // FR: Stocker les données pour export et graphiques
+    // DE: Daten für Export und Diagramme speichern
+    this.routeData = data;
 
-    // FR: Mettre à jour les statistiques dans la sidebar
-    // DE: Statistiken in der Sidebar aktualisieren
+    MapManager.drawRoutes(std.coordinates, elv.coordinates);
     this._updateStats(std, elv);
+    this._updateEnergyEstimates(std, elv);
+    this._buildElevationProfile(std, elv);
     this._showStats();
+
+    // FR: Activer les boutons d'export
+    // DE: Export-Buttons aktivieren
+    document.getElementById('btn-geojson').disabled = false;
+    document.getElementById('btn-gpx').disabled     = false;
 
     this._setStatus(
       'success',
@@ -84,8 +150,236 @@ const app = {
   },
 
   // -------------------------------------------------------------------
-  // FR: Met à jour les cartes de statistiques
-  // DE: Aktualisiert die Statistik-Karten
+  // FR: Estimation de la consommation d'énergie E-Scooter
+  // DE: Schätzung des E-Scooter Energieverbrauchs
+  // Formule / Formel: E = (masse * g * distance * Cr + masse * g * dénivelé) / efficacité
+  // -------------------------------------------------------------------
+  _updateEnergyEstimates(std, elv) {
+    const stdWh  = Utils.estimateEnergy(std.distance_m,  std.elevation_gain_m);
+    const elvWh  = Utils.estimateEnergy(elv.distance_m, elv.elevation_gain_m);
+
+    document.getElementById('std-energy').textContent = `${stdWh} Wh`;
+    document.getElementById('elv-energy').textContent = `${elvWh} Wh`;
+    document.getElementById('std-energy-row').style.display = 'flex';
+    document.getElementById('elv-energy-row').style.display = 'flex';
+  },
+
+  // -------------------------------------------------------------------
+  // FR: Construit le graphique du profil de hauteur avec Chart.js
+  // DE: Erstellt das Höhenprofil-Diagramm mit Chart.js
+  // -------------------------------------------------------------------
+  _buildElevationProfile(std, elv) {
+    // FR: Simuler une élévation basée sur la distance (données SRTM non dispo)
+    // DE: Höhe basierend auf Distanz simulieren (SRTM-Daten nicht verfügbar)
+    this._chartDataStd = this._simulateElevationProfile(std);
+    this._chartDataElv = this._simulateElevationProfile(elv);
+
+    document.getElementById('elevation-profile').style.display = 'block';
+    this.showChart('standard');
+  },
+
+  _simulateElevationProfile(route) {
+    // FR: Crée des points de distance réguliers le long de la route
+    // DE: Erstellt gleichmäßige Distanzpunkte entlang der Route
+    const n = Math.min(route.coordinates.length, 40);
+    const step = Math.floor(route.coordinates.length / n);
+    const labels = [];
+    const values = [];
+    let dist = 0;
+
+    for (let i = 0; i < route.coordinates.length; i += step) {
+      dist += (route.distance_m / n) / 1000;
+      labels.push(dist.toFixed(2) + ' km');
+      // FR: Valeur simulée — sera remplacée par vraies données SRTM
+      // DE: Simulierter Wert — wird durch echte SRTM-Daten ersetzt
+      values.push(200 + Math.round(Math.random() * route.elevation_gain_m * 0.3));
+    }
+    return { labels, values };
+  },
+
+  showChart(type) {
+    // FR: Basculer les onglets du graphique
+    // DE: Diagramm-Tabs wechseln
+    document.getElementById('chart-tab-std').classList.toggle('active', type === 'standard');
+    document.getElementById('chart-tab-elv').classList.toggle('active', type === 'elevation');
+
+    const data   = type === 'standard' ? this._chartDataStd : this._chartDataElv;
+    const color  = type === 'standard' ? '#4A9EFF' : '#00C9A7';
+    const canvas = document.getElementById('elevation-chart');
+
+    if (this.elevationChart) {
+      this.elevationChart.destroy();
+    }
+
+    this.elevationChart = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels:   data.labels,
+        datasets: [{
+          data:            data.values,
+          borderColor:     color,
+          backgroundColor: color + '22',
+          borderWidth:     2,
+          pointRadius:     0,
+          fill:            true,
+          tension:         0.4,
+        }]
+      },
+      options: {
+        responsive:          true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: {
+            ticks: {
+              color: '#505870',
+              font: { size: 9 },
+              maxTicksLimit: 5,
+            },
+            grid: { color: '#252A36' }
+          },
+          y: {
+            ticks: {
+              color: '#505870',
+              font: { size: 9 },
+              callback: v => v + ' m'
+            },
+            grid: { color: '#252A36' }
+          }
+        }
+      }
+    });
+  },
+
+  // -------------------------------------------------------------------
+  // FR: Calcul de l'isochrone
+  // DE: Isochronen-Berechnung
+  // -------------------------------------------------------------------
+  async calculateIsochrone() {
+    const lat     = parseFloat(document.getElementById('start_lat').value);
+    const lon     = parseFloat(document.getElementById('start_lon').value);
+    const time    = parseInt(document.getElementById('iso-time').value);
+    const profile = document.getElementById('iso-profile').value;
+
+    if (isNaN(lat) || isNaN(lon)) {
+      this._showError('Bitte zuerst einen Startpunkt setzen');
+      return;
+    }
+
+    this._setStatus('loading', 'Isochronen wird berechnet…');
+
+    try {
+      const data = await RoutingService.fetchIsochrone(lat, lon, time, profile);
+      MapManager.drawIsochrone(data.isochrone.coordinates, time);
+      this._setStatus('success', `Isochronen: ${time} min Erreichbarkeit`);
+    } catch (error) {
+      this._showError(error.message);
+      this._setStatus('error', 'Fehler bei der Isochronen-Berechnung');
+    }
+  },
+
+  clearIsochrone() {
+    MapManager.clearIsochrone();
+    this._setStatus('ready', 'Isochronen entfernt');
+  },
+
+  // -------------------------------------------------------------------
+  // FR: Export GeoJSON — format standard pour systèmes autonomes
+  // DE: GeoJSON-Export — Standardformat für autonome Systeme
+  // -------------------------------------------------------------------
+  exportGeoJSON() {
+    if (!this.routeData) return;
+
+    const std = this.routeData.standard_route;
+    const elv = this.routeData.elevation_optimized_route;
+
+    const geojson = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          properties: {
+            name:         "Standard Route",
+            profile:      "bike",
+            distance_m:   std.distance_m,
+            duration_s:   std.duration_s,
+          },
+          geometry: {
+            type: "LineString",
+            // FR: Leaflet [lat,lon] → GeoJSON [lon,lat]
+            // DE: Leaflet [lat,lon] → GeoJSON [lon,lat]
+            coordinates: std.coordinates.map(c => [c[1], c[0]])
+          }
+        },
+        {
+          type: "Feature",
+          properties: {
+            name:         "Höhenoptimierte Route",
+            profile:      "bike_elevation",
+            distance_m:   elv.distance_m,
+            duration_s:   elv.duration_s,
+          },
+          geometry: {
+            type: "LineString",
+            coordinates: elv.coordinates.map(c => [c[1], c[0]])
+          }
+        }
+      ]
+    };
+
+    this._downloadFile(
+      JSON.stringify(geojson, null, 2),
+      'hd_map_routes.geojson',
+      'application/json'
+    );
+  },
+
+  // -------------------------------------------------------------------
+  // FR: Export GPX — compatible GPS, ROS, Apollo.auto
+  // DE: GPX-Export — kompatibel mit GPS, ROS, Apollo.auto
+  // -------------------------------------------------------------------
+  exportGPX() {
+    if (!this.routeData) return;
+
+    const std = this.routeData.standard_route;
+
+    // FR: Construire le XML GPX
+    // DE: GPX-XML aufbauen
+    const trackpoints = std.coordinates
+      .map(c => `    <trkpt lat="${c[0]}" lon="${c[1]}"></trkpt>`)
+      .join('\n');
+
+    const gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="HD-Map Routing — BHT Berlin"
+     xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>HD-Map Routing Export</name>
+    <desc>Micro-Mobility Route — Freiburg im Breisgau</desc>
+  </metadata>
+  <trk>
+    <name>Standard Route</name>
+    <trkseg>
+${trackpoints}
+    </trkseg>
+  </trk>
+</gpx>`;
+
+    this._downloadFile(gpx, 'hd_map_route.gpx', 'application/gpx+xml');
+  },
+
+  _downloadFile(content, filename, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  // -------------------------------------------------------------------
+  // FR: Mise à jour des statistiques
+  // DE: Aktualisierung der Statistiken
   // -------------------------------------------------------------------
   _updateStats(std, elv) {
     document.getElementById('std-distance').textContent = Utils.formatDistance(std.distance_m);
@@ -98,15 +392,13 @@ const app = {
     document.getElementById('elv-gain').textContent     = Utils.formatElevation(elv.elevation_gain_m);
     document.getElementById('elv-loss').textContent     = Utils.formatElevation(elv.elevation_loss_m);
 
-    // FR: Résumé des économies
-    // DE: Zusammenfassung der Einsparungen
     document.getElementById('savings-box').innerHTML =
       Utils.buildSavingsSummary(std, elv);
   },
 
   // -------------------------------------------------------------------
-  // FR: Fonctions utilitaires pour l'interface
-  // DE: Hilfsfunktionen für die Benutzeroberfläche
+  // FR: Fonctions UI
+  // DE: UI-Hilfsfunktionen
   // -------------------------------------------------------------------
   _setLoading(isLoading) {
     const btn = document.getElementById('btn-route');
@@ -124,6 +416,12 @@ const app = {
     const bar = document.getElementById('status-bar');
     bar.className = `status-bar ${type}`;
     document.getElementById('status-text').textContent = message;
+  },
+
+  _setGeoResult(which, message, isError) {
+    const el = document.getElementById(`${which}-geo-result`);
+    el.textContent = message;
+    el.className = isError ? 'geo-result error' : 'geo-result';
   },
 
   _showError(message) {
@@ -145,6 +443,4 @@ const app = {
 
 };
 
-// FR: Démarre l'app quand le DOM est prêt
-// DE: Startet die App wenn der DOM bereit ist
 document.addEventListener('DOMContentLoaded', () => app.init());

@@ -5,12 +5,7 @@ from flask import Blueprint, request, jsonify
 from graphhopper_client import GraphHopperClient
 from utils import validate_coordinates, format_error, format_success
 
-# FR: Blueprint regroupe tous les endpoints sous /api/
-# DE: Blueprint gruppiert alle Endpunkte unter /api/
 api_blueprint = Blueprint("api", __name__)
-
-# FR: Instance unique du client GraphHopper
-# DE: Einzige Instanz des GraphHopper-Clients
 gh_client = GraphHopperClient(base_url="http://localhost:8989")
 
 
@@ -20,26 +15,18 @@ gh_client = GraphHopperClient(base_url="http://localhost:8989")
 @api_blueprint.route("/route", methods=["POST"])
 def calculate_route():
     """
-    FR: Reçoit les coordonnées, interroge GraphHopper pour les deux profils,
-        retourne les deux routes en JSON.
-    DE: Empfängt Koordinaten, fragt GraphHopper für beide Profile ab,
-        gibt beide Routen als JSON zurück.
+    FR: Calcule les deux routes (standard + optimisée).
+    DE: Berechnet beide Routen (Standard + höhenoptimiert).
     """
-    # FR: Lire le corps JSON de la requête
-    # DE: JSON-Body der Anfrage lesen
     data = request.get_json()
     if not data:
         return jsonify(format_error("Le corps de la requête doit être du JSON")), 400
 
-    # FR: Vérifier que tous les champs obligatoires sont présents
-    # DE: Prüfen ob alle Pflichtfelder vorhanden sind
     required = ["start_lat", "start_lon", "end_lat", "end_lon"]
     missing = [f for f in required if f not in data]
     if missing:
         return jsonify(format_error(f"Paramètres manquants: {', '.join(missing)}")), 400
 
-    # FR: Convertir en float
-    # DE: In Float umwandeln
     try:
         start_lat = float(data["start_lat"])
         start_lon = float(data["start_lon"])
@@ -48,14 +35,10 @@ def calculate_route():
     except (ValueError, TypeError):
         return jsonify(format_error("Les coordonnées doivent être des nombres valides")), 400
 
-    # FR: Valider les coordonnées
-    # DE: Koordinaten validieren
     error = validate_coordinates(start_lat, start_lon, end_lat, end_lon)
     if error:
         return jsonify(format_error(error)), 400
 
-    # FR: Interroger GraphHopper pour les deux profils
-    # DE: GraphHopper für beide Profile abfragen
     try:
         standard_route  = gh_client.get_route(
             start_lat, start_lon, end_lat, end_lon, profile="bike"
@@ -69,6 +52,56 @@ def calculate_route():
         return jsonify(format_error(str(e))), 404
 
     return jsonify(format_success(standard_route, elevation_route)), 200
+
+
+# -----------------------------------------------------------------------------
+# POST /api/isochrone
+# FR: Calcule une zone d'accessibilité depuis un point
+# DE: Berechnet eine Erreichbarkeitszone von einem Punkt
+# -----------------------------------------------------------------------------
+@api_blueprint.route("/isochrone", methods=["POST"])
+def calculate_isochrone():
+    """
+    FR: Reçoit un point et un temps limite, retourne le polygone d'isochrone.
+    DE: Empfängt einen Punkt und ein Zeitlimit, gibt das Isochronen-Polygon zurück.
+
+    Body: { lat, lon, time_minutes, profile }
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify(format_error("JSON body erforderlich")), 400
+
+    required = ["lat", "lon", "time_minutes"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return jsonify(format_error(f"Fehlende Parameter: {', '.join(missing)}")), 400
+
+    try:
+        lat          = float(data["lat"])
+        lon          = float(data["lon"])
+        time_minutes = int(data["time_minutes"])
+        profile      = data.get("profile", "bike")
+    except (ValueError, TypeError):
+        return jsonify(format_error("Ungültige Parameter")), 400
+
+    if not (1 <= time_minutes <= 60):
+        return jsonify(format_error("time_minutes doit être entre 1 et 60")), 400
+
+    try:
+        isochrone = gh_client.get_isochrone(
+            lat, lon,
+            profile=profile,
+            time_limit_seconds=time_minutes * 60
+        )
+    except ConnectionError as e:
+        return jsonify(format_error(str(e))), 503
+    except ValueError as e:
+        return jsonify(format_error(str(e))), 404
+
+    return jsonify({
+        "status":    "success",
+        "isochrone": isochrone
+    }), 200
 
 
 # -----------------------------------------------------------------------------
