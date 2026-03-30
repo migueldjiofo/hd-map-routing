@@ -97,7 +97,7 @@ Berlin ist fast vollständig flach (max. 80m Höhenunterschied). Freiburg liegt 
 | **Zwei Routing-Profile** | Standard (bike) und Höhenoptimiert (Custom Model mit `average_slope`) |
 | **Adresseingabe** | Straße + Hausnummer + PLZ + Stadt via Nominatim Geocoding |
 | **Kartenklick** | Start und Ziel per Klick auf die Karte setzen |
-| **4 Kartenstile** | Dark, Light, OSM, Topo — Routenfarben passen sich automatisch an |
+| **4 Kartenstile** | Dark, Light, OSM, Topo, Routenfarben passen sich automatisch an |
 | **Echtes Höhenprofil** | Chart.js Diagramm mit NASA SRTM 30m Daten |
 | **Energieschätzung** | Physikalisches Modell: `E = (m·g·Cr·d + m·g·h) / η` in Wh |
 | **Isochronen** | Erreichbarkeitszone von einem Startpunkt in X Minuten |
@@ -233,7 +233,7 @@ Die ursprüngliche Architektur sah vor, dass GraphHopper die SRTM-Höhendaten di
 
 - Provider `srtm`: Lokale HGT-Dateien nicht gefunden
 - Provider `skadi`: Format inkompatibel
-- Provider `cgiar`: Gleicher Fehler — *"Elevation not supported!"*
+- Provider `cgiar`: Gleicher Fehler, *"Elevation not supported!"*
 - Unterordner `N47/`: Richtige Struktur, aber GraphHopper ignorierte die Dateien
 
 Diese Einschränkung ist eine bekannte Kompatibilitätsproblematik zwischen GraphHopper 11 und lokal gespeicherten SRTM-Dateien.
@@ -298,7 +298,7 @@ In einer früheren Version wurde das Höhenprofil-Diagramm mit simulierten, zuf�
 | **GraphHopper** | Custom Model mit `average_slope`, zwei Profile, Isochronen |
 | **Autonome Navigation** | Export für Apollo.auto (GeoJSON) und ROS (GPX) |
 | **Routing-Algorithmen** | GraphHopper Landmark-Algorithmus (LM) für Custom Models |
-| **Micro-Mobility** | bike-Profil statt car-Profil — realistische E-Scooter-Simulation |
+| **Micro-Mobility** | bike-Profil statt car-Profil, realistische E-Scooter-Simulation |
 
 ---
 
