@@ -29,8 +29,8 @@ Dieses Projekt wurde im Kurs **Navigation (WS 2025/2026)** an der Berliner Hochs
 
 Die Anwendung berechnet und vergleicht zwei Routen zwischen einem Start- und Zielpunkt in **Freiburg im Breisgau**:
 
-- **Standard-Route** — Die schnellste/kürzeste Verbindung (bike-Profil)
-- **Höhenoptimierte Route** — Eine Route mit minimalen Steigungen, die Energie spart und den Fahrkomfort verbessert
+- **Standard-Route**: Die schnellste/kürzeste Verbindung (bike-Profil)
+- **Höhenoptimierte Route**: Eine Route mit minimalen Steigungen, die Energie spart und den Fahrkomfort verbessert
 
 Das HD-Map-Feature wird durch die Integration von echten **NASA SRTM-Höhendaten (30m Auflösung)** simuliert. Diese werden in die Kostenfunktion des Routing-Algorithmus eingebunden:
 
@@ -44,7 +44,7 @@ Kanten mit einer Steigung von mehr als 3% werden progressiv bestraft, sodass Gra
 
 ## 2. Use Case
 
-Eine Person fährt mit einem **E-Scooter** in Freiburg im Breisgau — eine Stadt mit starken Höhenunterschieden (Schwarzwald-Vorland). Sie möchte eine Route, die:
+Eine Person fährt mit einem **E-Scooter** in Freiburg im Breisgau eine Stadt mit starken Höhenunterschieden (Schwarzwald-Vorland). Sie möchte eine Route, die:
 
 - nicht unbedingt die kürzeste oder schnellste ist
 - **möglichst wenig Steigung** hat, um den Akku zu schonen
@@ -86,7 +86,7 @@ Die Anwendung folgt einer klassischen **3-Schichten-Architektur**:
 | Geocoding | Nominatim / OpenStreetMap | extern |
 
 **Warum Freiburg und nicht Berlin?**  
-Berlin ist fast vollständig flach (max. 80m Höhenunterschied). Freiburg liegt am Rand des Schwarzwalds — der Schauinsland (1284m) bietet ideale Bedingungen, um den Unterschied zwischen den beiden Routing-Profilen sichtbar zu machen.
+Berlin ist fast vollständig flach (max. 80m Höhenunterschied). Freiburg liegt am Rand des Schwarzwalds, der Schauinsland (1284m) bietet ideale Bedingungen, um den Unterschied zwischen den beiden Routing-Profilen sichtbar zu machen.
 
 ---
 
@@ -119,14 +119,14 @@ HDD: 2 GB+  → für OSM + Cache
 
 ## 6. Installation und Start
 
-### Schritt 1 — Repository klonen
+### Schritt 1: Repository klonen
 
 ```powershell
 git clone https://github.com/migueldjiofo/hd-map-routing.git
 cd hd-map-routing
 ```
 
-### Schritt 2 — GraphHopper einrichten
+### Schritt 2: GraphHopper einrichten
 
 Folgende Dateien in `backend\graphhopper\` ablegen:
 
@@ -142,7 +142,7 @@ https://download.geofabrik.de/europe/germany/baden-wuerttemberg/freiburg-regbez-
 
 > Die `config.yml` und `elevation_penalty.json` sind bereits im Repository enthalten.
 
-### Schritt 3 — Python-Abhängigkeiten installieren
+### Schritt 3: Python-Abhängigkeiten installieren
 
 ```powershell
 cd backend\api
@@ -151,16 +151,16 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-### Schritt 4 — Anwendung starten (3 Terminals)
+### Schritt 4: Anwendung starten (3 Terminals)
 
-**Terminal 1 — GraphHopper** *(beim ersten Start: 5-15 min Wartezeit)*
+**Terminal 1: GraphHopper** *(beim ersten Start: 5-15 min Wartezeit)*
 ```powershell
 cd backend\graphhopper
 java -Xmx2g -jar graphhopper-web-11.0.jar server config.yml
 # Warten bis: "Started application" erscheint
 ```
 
-**Terminal 2 — Flask Backend**
+**Terminal 2: Flask Backend**
 ```powershell
 cd backend\api
 .\venv\Scripts\Activate.ps1
@@ -168,7 +168,7 @@ python app.py
 # Läuft auf http://localhost:5000
 ```
 
-**Terminal 3 — Frontend**
+**Terminal 3: Frontend**
 ```powershell
 cd frontend\src
 python -m http.server 8000
@@ -180,7 +180,7 @@ python -m http.server 8000
 ## 7. Anwendung benutzen
 
 1. Browser öffnen: **`http://localhost:8000`**
-2. **Adresse eingeben** — Startadresse und Zieladresse eingeben, dann ⌕ klicken
+2. **Adresse eingeben**: Startadresse und Zieladresse eingeben, dann ⌕ klicken
 3. **Route berechnen** klicken
 4. **Routen vergleichen:**
    - 🔵 Blau = Standard-Route (schnellste)
@@ -215,7 +215,7 @@ UnsupportedClassVersionError: class file version 61.0, recognizes up to 52.0
 
 **Lösung:** Manuelle Aktualisierung von `JAVA_HOME` und `PATH` in der PowerShell als Administrator.
 
-### 8.2 GraphHopper 11 Konfiguration — Neue Syntax
+### 8.2 GraphHopper 11 Konfiguration: Neue Syntax
 
 GraphHopper 11 hat eine neue Konfigurationssyntax. Es gab insgesamt **6 Iterationen** bis die Konfiguration korrekt war:
 
@@ -227,7 +227,7 @@ GraphHopper 11 hat eine neue Konfigurationssyntax. Es gab insgesamt **6 Iteratio
 | `custom_model_files` + `custom_model` nicht kombinierbar | Separate Datei `elevation_penalty.json` erstellt |
 | `graph.encoded_values` fehlt | Alle benötigten Werte explizit aufgelistet |
 
-### 8.3 SRTM-Höhendaten — Lokale Integration gescheitert
+### 8.3 SRTM-Höhendaten: Lokale Integration gescheitert
 
 Die ursprüngliche Architektur sah vor, dass GraphHopper die SRTM-Höhendaten direkt aus lokalen HGT-Dateien liest. Dies schlug trotz mehrerer Versuche fehl:
 
@@ -238,7 +238,7 @@ Die ursprüngliche Architektur sah vor, dass GraphHopper die SRTM-Höhendaten di
 
 Diese Einschränkung ist eine bekannte Kompatibilitätsproblematik zwischen GraphHopper 11 und lokal gespeicherten SRTM-Dateien.
 
-### 8.4 Open-Elevation API — Falsche Höhendaten
+### 8.4 Open-Elevation API: Falsche Höhendaten
 
 Als erste externe Alternative wurde die Open-Elevation API verwendet. Diese lieferte jedoch für alle Punkte in Freiburg fast identische Werte (~190-210m), obwohl der Schauinsland 1284m hoch ist.
 
@@ -260,7 +260,7 @@ Freiburg im Breisgau bietet ideale Bedingungen: Der Schauinsland (1284m) und die
 
 ### 9.2 Fahrzeugprofil: `car` → `bike`
 
-Ein E-Scooter darf nicht auf Autobahnen fahren, kann aber Radwege nutzen. Das `bike`-Profil in GraphHopper berücksichtigt Radwege und vermeidet Schnellstraßen — korrekt für den Use Case.
+Ein E-Scooter darf nicht auf Autobahnen fahren, kann aber Radwege nutzen. Das `bike`-Profil in GraphHopper berücksichtigt Radwege und vermeidet Schnellstraßen. korrekt für den Use Case.
 
 ### 9.3 Höhendaten: Lokal → API-basiert (OpenTopoData)
 
